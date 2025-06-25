@@ -1,18 +1,8 @@
 use anyhow::Error;
 use owo_colors::OwoColorize;
-use std::process::Command;
+use std::{path::Path, process::Command};
 
-const CHAIN_ID: &str = "evmos_9002-1";
-const KEYRING_BACKEND: &str = "test";
-const KEY_ALGO: &str = "eth_secp256k1";
-const BASE_DENOM: &str = "aevmos";
-const MONIKER: &str = "localtestnet";
-const BASEFEE: u64 = 1000000000;
-const VAL_KEY: &str = "mykey";
-const USER1_KEY: &str = "dev0";
-const USER2_KEY: &str = "dev1";
-const USER3_KEY: &str = "dev2";
-const USER4_KEY: &str = "dev3";
+use crate::types::EvmosUpConfig;
 
 pub fn up() -> Result<(), Error> {
     if verify_evmosd_home().is_ok() {
@@ -58,8 +48,7 @@ fn verify_evmosd_home() -> Result<(), Error> {
 }
 
 fn set_config() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
 
     Command::new("sh")
         .arg("-c")
@@ -68,10 +57,10 @@ fn set_config() -> Result<(), Error> {
         .stderr(std::process::Stdio::inherit())
         .arg(&format!(
             "evmosd config set client chain-id {} --home {} && evmosd config set client keyring-backend {} --home {}",
-            CHAIN_ID,
-            evmos_home.display(),
-            KEYRING_BACKEND,
-            evmos_home.display()
+            config.chain_id,
+            config.home,
+            config.keyring_backend,
+            config.home
         ))
         .spawn()?
         .wait()?;
@@ -80,33 +69,8 @@ fn set_config() -> Result<(), Error> {
 }
 
 fn import_keys() -> Result<(), Error> {
-    let val_key = VAL_KEY;
-    let val_mnemonic = "gesture inject test cycle original hollow east ridge hen combine junk child bacon zero hope comfort vacuum milk pitch cage oppose unhappy lunar seat";
-
-    let user1_key = USER1_KEY;
-    let user1_mnemonic = "copper push brief egg scan entry inform record adjust fossil boss egg comic alien upon aspect dry avoid interest fury window hint race symptom";
-
-    let user2_key = USER2_KEY;
-    let user2_mnemonic = "maximum display century economy unlock van census kite error heart snow filter midnight usage egg venture cash kick motor survey drastic edge muffin visual";
-
-    let user3_key = USER3_KEY;
-    let user3_mnemonic = "will wear settle write dance topic tape sea glory hotel oppose rebel client problem era video gossip glide during yard balance cancel file rose";
-
-    let user4_key = USER4_KEY;
-    let user4_mnemonic = "doll midnight silk carpet brush boring pluck office gown inquiry duck chief aim exit gain never tennis crime fragile ship cloud surface exotic patch";
-
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
-
-    let keys = [
-        (val_key, val_mnemonic),
-        (user1_key, user1_mnemonic),
-        (user2_key, user2_mnemonic),
-        (user3_key, user3_mnemonic),
-        (user4_key, user4_mnemonic),
-    ];
-
-    for (key, mnemonic) in keys.iter() {
+    let config = EvmosUpConfig::default();
+    for account in config.genesis_accounts.iter() {
         Command::new("sh")
             .stdin(std::process::Stdio::inherit())
             .stdout(std::process::Stdio::inherit())
@@ -114,11 +78,11 @@ fn import_keys() -> Result<(), Error> {
             .arg("-c")
             .arg(format!(
                 "echo '{}' | evmosd keys add '{}' --recover --keyring-backend {} --algo {} --home {}",
-                mnemonic,
-                key,
-                KEYRING_BACKEND,
-                KEY_ALGO,
-                evmos_home.display()
+                account.mnemonic,
+                account.name,
+                config.keyring_backend,
+                config.key_algo,
+                config.home
             ))
             .spawn()?
             .wait()?;
@@ -128,47 +92,44 @@ fn import_keys() -> Result<(), Error> {
 }
 
 fn set_gas_limit() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
     Command::new("sh")
         .arg("-c")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
-        .arg(&format!(r#"jq '.consensus_params["block"]["max_gas"]="10000000"' {}/config/genesis.json >/tmp/genesis.json && mv /tmp/genesis.json {}/config/genesis.json"#, evmos_home.display(), evmos_home.display()))
+        .arg(&format!(r#"jq '.consensus_params["block"]["max_gas"]="10000000"' {}/config/genesis.json >/tmp/genesis.json && mv /tmp/genesis.json {}/config/genesis.json"#, config.home, config.home))
         .spawn()?
         .wait()?;
     Ok(())
 }
 
 fn set_base_fee() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
     Command::new("sh")
         .arg("-c")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
-        .arg(&format!(r#"jq '.app_state["feemarket"]["params"]["base_fee"]='{}' {}/config/genesis.json >/tmp/genesis.json && mv /tmp/genesis.json {}/config/genesis.json"#, BASEFEE, evmos_home.display(), evmos_home.display()))
+        .arg(&format!(r#"jq '.app_state["feemarket"]["params"]["base_fee"]='{}' {}/config/genesis.json >/tmp/genesis.json && mv /tmp/genesis.json {}/config/genesis.json"#, config.basefee, config.home, config.home))
         .spawn()?
         .wait()?;
     Ok(())
 }
 
 fn init() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .arg("init")
-        .arg(MONIKER)
+        .arg(config.moniker)
         .arg("-o")
         .arg("--chain-id")
-        .arg(CHAIN_ID)
+        .arg(config.chain_id)
         .arg("--home")
-        .arg(evmos_home)
+        .arg(config.home)
         .arg("--overwrite")
         .spawn()?
         .wait()?;
@@ -177,9 +138,8 @@ fn init() -> Result<(), Error> {
 }
 
 fn enable_api() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
-    let app_toml_path = evmos_home.join("config").join("app.toml");
+    let config = EvmosUpConfig::default();
+    let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
         .arg("-c")
@@ -198,9 +158,8 @@ fn enable_api() -> Result<(), Error> {
 }
 
 fn disable_rosetta_api() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
-    let app_toml_path = evmos_home.join("config").join("app.toml");
+    let config = EvmosUpConfig::default();
+    let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
         .arg("-c")
@@ -218,9 +177,8 @@ fn disable_rosetta_api() -> Result<(), Error> {
 }
 
 fn disable_memiavl() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
-    let app_toml_path = evmos_home.join("config").join("app.toml");
+    let config = EvmosUpConfig::default();
+    let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
         .arg("-c")
@@ -238,9 +196,8 @@ fn disable_memiavl() -> Result<(), Error> {
 }
 
 fn disable_versiondb() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
-    let app_toml_path = evmos_home.join("config").join("app.toml");
+    let config = EvmosUpConfig::default();
+    let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
         .arg("-c")
@@ -258,9 +215,8 @@ fn disable_versiondb() -> Result<(), Error> {
 }
 
 fn change_proposal_periods() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
-    let genesis_path = evmos_home.join("config").join("genesis.json");
+    let config = EvmosUpConfig::default();
+    let genesis_path = Path::new(&config.home).join("config").join("genesis.json");
 
     Command::new("sh")
         .arg("-c")
@@ -279,9 +235,8 @@ fn change_proposal_periods() -> Result<(), Error> {
 }
 
 fn change_pruning_settings() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
-    let app_toml_path = evmos_home.join("config").join("app.toml");
+    let config = EvmosUpConfig::default();
+    let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
         .arg("-c")
@@ -301,10 +256,9 @@ fn change_pruning_settings() -> Result<(), Error> {
 }
 
 fn allocate_genesis_accounts() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
 
-    for key in [VAL_KEY, USER1_KEY, USER2_KEY, USER3_KEY, USER4_KEY].iter() {
+    for account in config.genesis_accounts.iter() {
         Command::new("sh")
             .arg("-c")
             .stdin(std::process::Stdio::inherit())
@@ -312,7 +266,12 @@ fn allocate_genesis_accounts() -> Result<(), Error> {
             .stderr(std::process::Stdio::inherit())
             .arg(&format!(
                 r#"evmosd add-genesis-account "$(evmosd keys show {} -a --keyring-backend {} --home {})" 100000000000000000000000000{} --keyring-backend {} --home {}"#,
-                key, KEYRING_BACKEND, evmos_home.display(), BASE_DENOM, KEYRING_BACKEND, evmos_home.display()
+                account.name,
+                config.keyring_backend,
+                config.home,
+                config.base_denom,
+                config.keyring_backend,
+                config.home
             ))
             .spawn()?
             .wait()?;
@@ -322,71 +281,71 @@ fn allocate_genesis_accounts() -> Result<(), Error> {
 }
 
 fn sign_genesis_transaction() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
+
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .arg("gentx")
-        .arg(VAL_KEY)
-        .arg(&format!("1000000000000000000000{}", BASE_DENOM))
+        .arg(config.genesis_accounts[0].name.clone())
+        .arg(&format!("1000000000000000000000{}", config.base_denom))
         .arg("--gas-prices")
-        .arg(format!("{}{}", BASEFEE, BASE_DENOM))
+        .arg(format!("{}{}", config.basefee, config.base_denom))
         .arg("--keyring-backend")
-        .arg(KEYRING_BACKEND)
+        .arg(config.keyring_backend)
         .arg("--chain-id")
-        .arg(CHAIN_ID)
+        .arg(config.chain_id)
         .arg("--home")
-        .arg(evmos_home)
+        .arg(config.home)
         .spawn()?
         .wait()?;
     Ok(())
 }
 
 fn collect_gentxs() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .arg("collect-gentxs")
         .arg("--home")
-        .arg(evmos_home)
+        .arg(config.home)
         .spawn()?
         .wait()?;
     Ok(())
 }
 
 fn validate_genesis() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .arg("validate-genesis")
         .arg("--home")
-        .arg(evmos_home)
+        .arg(config.home)
         .spawn()?
         .wait()?;
     Ok(())
 }
 
 fn start() -> Result<(), Error> {
-    let home = dirs::home_dir().unwrap();
-    let evmos_home = home.join(".evmosd");
+    let config = EvmosUpConfig::default();
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .arg("start")
         .arg("--home")
-        .arg(evmos_home)
+        .arg(config.home)
         .arg("--chain-id")
-        .arg(CHAIN_ID)
-        .arg(&format!("--minimum-gas-prices=0.0001{}", BASE_DENOM))
+        .arg(config.chain_id)
+        .arg(&format!(
+            "--minimum-gas-prices={}{}",
+            config.minimum_gas_prices, config.base_denom
+        ))
         .arg("--json-rpc.api")
         .arg("eth,txpool,personal,net,debug,web3")
         .spawn()?
