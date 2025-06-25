@@ -1,0 +1,12 @@
+[package]
+name = "evmosup"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+clap = "4.5.40"
+dirs = "6.0.0"
+owo-colors = "4.2.2"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
