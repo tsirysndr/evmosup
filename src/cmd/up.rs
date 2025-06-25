@@ -247,27 +247,6 @@ fn change_proposal_periods() -> Result<(), Error> {
     Ok(())
 }
 
-fn change_pruning_settings() -> Result<(), Error> {
-    let config = load_config()?;
-    let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
-
-    Command::new("sh")
-        .arg("-c")
-        .stdin(std::process::Stdio::inherit())
-        .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::inherit())
-        .arg(&format!(
-            r#"sed -i.bak 's/pruning = "default"/pruning = "custom"/g' {} && sed -i.bak 's/pruning-keep-recent = "0"/pruning-keep-recent = "2"/g' {} && sed -i.bak 's/pruning-interval = "0"/pruning-interval = "10"/g' {}"#,
-            app_toml_path.display(),
-            app_toml_path.display(),
-            app_toml_path.display()
-        ))
-        .spawn()?
-        .wait()?;
-
-    Ok(())
-}
-
 fn allocate_genesis_accounts() -> Result<(), Error> {
     let config = load_config()?;
 
