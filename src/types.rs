@@ -1,3 +1,6 @@
+use std::process::Command;
+
+use anyhow::Error;
 use serde::{Deserialize, Serialize};
 
 pub struct AppConfig {}
@@ -57,5 +60,34 @@ impl Default for EvmosUpConfig {
               },
             ],
         }
+    }
+}
+
+impl EvmosUpConfig {
+    pub fn new() -> Self {
+        EvmosUpConfig {
+            genesis_accounts: vec![],
+            ..EvmosUpConfig::default()
+        }
+    }
+
+    pub fn generate_accounts(&mut self, num_accounts: usize) -> Result<(), Error> {
+        self.genesis_accounts.clear();
+        for i in 0..num_accounts {
+            let cmd = Command::new("evmosd")
+                .arg("keys")
+                .arg("mnemonic")
+                .output()?;
+            if !cmd.status.success() {
+                return Err(Error::msg("Failed to generate mnemonic for account"));
+            }
+            let mnemonic = String::from_utf8(cmd.stdout)?.trim().to_string();
+            let account = Account {
+                name: format!("user{}_key", i + 1),
+                mnemonic,
+            };
+            self.genesis_accounts.push(account);
+        }
+        Ok(())
     }
 }

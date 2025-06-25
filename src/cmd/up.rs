@@ -20,7 +20,6 @@ pub fn up() -> Result<(), Error> {
     disable_memiavl()?;
     disable_versiondb()?;
     change_proposal_periods()?;
-    change_pruning_settings()?;
     allocate_genesis_accounts()?;
     sign_genesis_transaction()?;
     collect_gentxs()?;
@@ -48,7 +47,7 @@ fn verify_evmosd_home() -> Result<(), Error> {
 }
 
 fn set_config() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
 
     Command::new("sh")
         .arg("-c")
@@ -69,8 +68,22 @@ fn set_config() -> Result<(), Error> {
 }
 
 fn import_keys() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     for account in config.genesis_accounts.iter() {
+        if config.keyring_backend != "test" {
+            Command::new("sh")
+                .stdin(std::process::Stdio::inherit())
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .arg("-c")
+                .arg(format!(
+                    "evmosd keys add '{}' --recover --keyring-backend {} --algo {} --home {}",
+                    account.name, config.keyring_backend, config.key_algo, config.home
+                ))
+                .spawn()?
+                .wait()?;
+            continue;
+        }
         Command::new("sh")
             .stdin(std::process::Stdio::inherit())
             .stdout(std::process::Stdio::inherit())
@@ -92,7 +105,7 @@ fn import_keys() -> Result<(), Error> {
 }
 
 fn set_gas_limit() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     Command::new("sh")
         .arg("-c")
         .stdin(std::process::Stdio::inherit())
@@ -105,7 +118,7 @@ fn set_gas_limit() -> Result<(), Error> {
 }
 
 fn set_base_fee() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     Command::new("sh")
         .arg("-c")
         .stdin(std::process::Stdio::inherit())
@@ -118,7 +131,7 @@ fn set_base_fee() -> Result<(), Error> {
 }
 
 fn init() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
@@ -138,7 +151,7 @@ fn init() -> Result<(), Error> {
 }
 
 fn enable_api() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
@@ -158,7 +171,7 @@ fn enable_api() -> Result<(), Error> {
 }
 
 fn disable_rosetta_api() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
@@ -177,7 +190,7 @@ fn disable_rosetta_api() -> Result<(), Error> {
 }
 
 fn disable_memiavl() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
@@ -196,7 +209,7 @@ fn disable_memiavl() -> Result<(), Error> {
 }
 
 fn disable_versiondb() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
@@ -215,7 +228,7 @@ fn disable_versiondb() -> Result<(), Error> {
 }
 
 fn change_proposal_periods() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     let genesis_path = Path::new(&config.home).join("config").join("genesis.json");
 
     Command::new("sh")
@@ -235,7 +248,7 @@ fn change_proposal_periods() -> Result<(), Error> {
 }
 
 fn change_pruning_settings() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     let app_toml_path = Path::new(&config.home).join("config").join("app.toml");
 
     Command::new("sh")
@@ -256,7 +269,7 @@ fn change_pruning_settings() -> Result<(), Error> {
 }
 
 fn allocate_genesis_accounts() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
 
     for account in config.genesis_accounts.iter() {
         Command::new("sh")
@@ -281,7 +294,7 @@ fn allocate_genesis_accounts() -> Result<(), Error> {
 }
 
 fn sign_genesis_transaction() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
 
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
@@ -304,7 +317,7 @@ fn sign_genesis_transaction() -> Result<(), Error> {
 }
 
 fn collect_gentxs() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
@@ -318,7 +331,7 @@ fn collect_gentxs() -> Result<(), Error> {
 }
 
 fn validate_genesis() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
@@ -332,7 +345,7 @@ fn validate_genesis() -> Result<(), Error> {
 }
 
 fn start() -> Result<(), Error> {
-    let config = EvmosUpConfig::default();
+    let config = load_config()?;
     Command::new("evmosd")
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
@@ -351,4 +364,18 @@ fn start() -> Result<(), Error> {
         .spawn()?
         .wait()?;
     Ok(())
+}
+
+fn load_config() -> Result<EvmosUpConfig, Error> {
+    let config_path = "evmosup.toml";
+
+    if !Path::new(config_path).exists() {
+        return Ok(load_config()?);
+    }
+
+    let config_content = std::fs::read_to_string(config_path)
+        .map_err(|e| Error::msg(format!("Failed to read config file: {}", e)))?;
+    let config: EvmosUpConfig = toml::from_str(&config_content)
+        .map_err(|e| Error::msg(format!("Failed to parse config file: {}", e)))?;
+    Ok(config)
 }

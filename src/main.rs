@@ -9,21 +9,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = Command::new("evmosup")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Tsiry Sandratraina <tsiry.sndr@rocksky.app>")
-        .subcommand(Command::new("init").about("Generate a init file for Evmos setup"))
+        .subcommand(
+            Command::new("init")
+                .about("Generate a init file for Evmos setup")
+                .arg(
+                    Arg::new("accounts")
+                        .short('a')
+                        .long("accounts")
+                        .default_value("4")
+                        .help("Number of accounts to generate for the Evmos setup"),
+                ),
+        )
         .subcommand(
             Command::new("reset")
-                .about("Reset the Evmos blockchain, removing existing configurations")
-                .arg(
-                    Arg::new("force")
-                        .short('f')
-                        .long("force")
-                        .help("Force reset without confirmation"),
-                ),
+                .about("Reset the Evmos blockchain, removing existing configurations"),
         )
         .get_matches();
 
-    if let Some(_matches) = matches.subcommand_matches("init") {
-        init()?;
+    if let Some(matches) = matches.subcommand_matches("init") {
+        let accounts = matches.get_one::<String>("accounts").unwrap();
+        init(accounts.parse()?)?;
         return Ok(());
     }
 
